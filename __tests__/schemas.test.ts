@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { scoreSchema, eventSchema, participantSchema } from "@/lib/schemas";
+import { scoreSchema, eventSchema, participantSchema, getScoreLevel } from "@/lib/schemas";
 
 describe("scoreSchema", () => {
   const validScore = {
     participantId: "p1",
     judgeName: "Dr. Martinez",
-    creativity: 8,
-    scientificMethod: 7,
-    presentation: 9,
-    impact: 8,
+    creativity: 4,
+    thoroughness: 3,
+    clarity: 5,
+    studentIndependence: 4,
     feedback: "Great work!",
   };
 
@@ -22,8 +22,8 @@ describe("scoreSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("accepts boundary value 10", () => {
-    const result = scoreSchema.safeParse({ ...validScore, creativity: 10 });
+  it("accepts boundary value 5", () => {
+    const result = scoreSchema.safeParse({ ...validScore, creativity: 5 });
     expect(result.success).toBe(true);
   });
 
@@ -32,8 +32,8 @@ describe("scoreSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects score of 11", () => {
-    const result = scoreSchema.safeParse({ ...validScore, creativity: 11 });
+  it("rejects score of 6", () => {
+    const result = scoreSchema.safeParse({ ...validScore, creativity: 6 });
     expect(result.success).toBe(false);
   });
 
@@ -71,6 +71,28 @@ describe("scoreSchema", () => {
     const { feedback: _, ...rest } = validScore;
     const result = scoreSchema.safeParse(rest);
     expect(result.success).toBe(true);
+  });
+});
+
+describe("getScoreLevel", () => {
+  it("returns Developing for 1", () => {
+    expect(getScoreLevel(1)).toBe("Developing");
+  });
+
+  it("returns Developing for 2", () => {
+    expect(getScoreLevel(2)).toBe("Developing");
+  });
+
+  it("returns Competent for 3", () => {
+    expect(getScoreLevel(3)).toBe("Competent");
+  });
+
+  it("returns Advanced for 4", () => {
+    expect(getScoreLevel(4)).toBe("Advanced");
+  });
+
+  it("returns Advanced for 5", () => {
+    expect(getScoreLevel(5)).toBe("Advanced");
   });
 });
 

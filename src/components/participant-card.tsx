@@ -13,6 +13,7 @@ interface ParticipantCardProps {
   table?: number;
   location?: number;
   scored: boolean;
+  noShow?: boolean;
   onClick: () => void;
 }
 
@@ -25,6 +26,7 @@ export function ParticipantCard({
   table,
   location,
   scored,
+  noShow,
   onClick,
 }: ParticipantCardProps) {
   return (
@@ -112,7 +114,11 @@ export function ParticipantCard({
         </div>
 
         {/* Badge */}
-        {scored ? (
+        {noShow ? (
+          <span className="shrink-0 text-xs font-medium bg-red-50 text-red-500 px-3 py-1.5 rounded-full">
+            No Show
+          </span>
+        ) : scored ? (
           <span className="shrink-0 text-xs font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-full transition-all group-hover:bg-primary/20">
             Done
             <span className="hidden group-hover:inline ml-0.5">&middot; Edit</span>

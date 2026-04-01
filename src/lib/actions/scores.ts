@@ -8,9 +8,9 @@ export async function submitScore(data: {
   participantId: string;
   judgeName: string;
   creativity: number;
-  scientificMethod: number;
-  presentation: number;
-  impact: number;
+  thoroughness: number;
+  clarity: number;
+  studentIndependence: number;
   feedback?: string;
 }) {
   const parsed = scoreSchema.safeParse(data);
@@ -18,10 +18,9 @@ export async function submitScore(data: {
     return { error: parsed.error.message };
   }
 
-  const { participantId, judgeName, creativity, scientificMethod, presentation, impact, feedback } = parsed.data;
-  const total = creativity + scientificMethod + presentation + impact;
+  const { participantId, judgeName, creativity, thoroughness, clarity, studentIndependence, feedback } = parsed.data;
+  const total = creativity + thoroughness + clarity + studentIndependence;
 
-  // Composite doc ID prevents duplicate scores from same judge
   const scoreId = `${judgeName.toLowerCase().replace(/\s+/g, "-")}_${participantId}`;
 
   await adminDb
@@ -33,13 +32,47 @@ export async function submitScore(data: {
       participantId,
       judgeName,
       creativity,
-      scientificMethod,
-      presentation,
-      impact,
+      thoroughness,
+      clarity,
+      studentIndependence,
       feedback: feedback || "",
       total,
       submittedAt: new Date().toISOString(),
     });
 
   return { success: true };
+}
+
+export async function markNoShow(data: {
+  eventId: string;
+  participantId: string;
+  judgeName: string;
+}): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const { eventId, participantId, judgeName } = data;
+
+    const scoreId = `${judgeName.toLowerCase().replace(/\s+/g, "-")}_${participantId}`;
+
+    await adminDb
+      .collection("events")
+      .doc(eventId)
+      .collection("scores")
+      .doc(scoreId)
+      .set({
+        participantId,
+        judgeName,
+        creativity: 0,
+        thoroughness: 0,
+        clarity: 0,
+        studentIndependence: 0,
+        feedback: "",
+        total: 0,
+        noShow: true,
+        submittedAt: new Date().toISOString(),
+      });
+
+    return { success: true };
+  } catch {
+    return { error: "Failed to mark no show" };
+  }
 }

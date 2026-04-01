@@ -44,9 +44,9 @@ export default async function ScoreCardPage({ params }: Props) {
         stats
           ? {
               avgCreativity: stats.avgCreativity,
-              avgScientificMethod: stats.avgScientificMethod,
-              avgPresentation: stats.avgPresentation,
-              avgImpact: stats.avgImpact,
+              avgThoroughness: stats.avgThoroughness,
+              avgClarity: stats.avgClarity,
+              avgStudentIndependence: stats.avgStudentIndependence,
               avgTotal: stats.avgTotal,
               judgeCount: stats.judgeCount,
               feedbacks: stats.feedbacks,

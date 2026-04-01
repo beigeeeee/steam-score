@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { submitScore } from "@/lib/actions/scores";
+import { submitScore, markNoShow } from "@/lib/actions/scores";
 import { CountUp } from "@/components/reactbits/count-up";
 import { Magnet } from "@/components/reactbits/magnet";
 
@@ -37,21 +37,20 @@ export function ScoreForm({
   onClose,
   onScored,
 }: ScoreFormProps) {
-  const [creativity, setCreativity] = useState(5);
-  const [scientificMethod, setScientificMethod] = useState(5);
-  const [presentation, setPresentation] = useState(5);
-  const [impact, setImpact] = useState(5);
+  const [creativity, setCreativity] = useState(3);
+  const [thoroughness, setThoroughness] = useState(3);
+  const [clarity, setClarity] = useState(3);
+  const [studentIndependence, setStudentIndependence] = useState(3);
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const total = creativity + scientificMethod + presentation + impact;
+  const total = creativity + thoroughness + clarity + studentIndependence;
 
-  // Color gradient based on total score
   function getScoreColor() {
-    if (total >= 32) return "text-primary";
-    if (total >= 24) return "text-foreground";
+    if (total >= 16) return "text-primary";
+    if (total >= 12) return "text-foreground";
     return "text-muted-foreground";
   }
 
@@ -64,9 +63,9 @@ export function ScoreForm({
       participantId,
       judgeName,
       creativity,
-      scientificMethod,
-      presentation,
-      impact,
+      thoroughness,
+      clarity,
+      studentIndependence,
       feedback: feedback || undefined,
     });
 
@@ -80,10 +79,10 @@ export function ScoreForm({
     setSuccess(true);
     setTimeout(() => {
       setSuccess(false);
-      setCreativity(5);
-      setScientificMethod(5);
-      setPresentation(5);
-      setImpact(5);
+      setCreativity(3);
+      setThoroughness(3);
+      setClarity(3);
+      setStudentIndependence(3);
       setFeedback("");
       onScored();
       onClose();
@@ -149,7 +148,7 @@ export function ScoreForm({
                 transition={{ delay: 0.6 }}
                 className="text-sm text-muted-foreground"
               >
-                {total}/40
+                {total}/20
               </motion.p>
             </motion.div>
           ) : (
@@ -162,10 +161,10 @@ export function ScoreForm({
             >
               {/* Category scores with staggered entrance */}
               {[
-                { label: "Creativity / Innovation", value: creativity, set: setCreativity },
-                { label: "Scientific Method", value: scientificMethod, set: setScientificMethod },
-                { label: "Presentation", value: presentation, set: setPresentation },
-                { label: "Impact / Relevance", value: impact, set: setImpact },
+                { label: "Creativity", value: creativity, set: setCreativity },
+                { label: "Thoroughness", value: thoroughness, set: setThoroughness },
+                { label: "Clarity", value: clarity, set: setClarity },
+                { label: "Student Independence", value: studentIndependence, set: setStudentIndependence },
               ].map((cat, i) => (
                 <motion.div
                   key={cat.label}
@@ -239,14 +238,15 @@ export function ScoreForm({
                 >
                   {total}
                 </motion.span>
-                <span className="text-sm text-muted-foreground">/40</span>
+                <span className="text-sm text-muted-foreground">/20</span>
               </motion.div>
 
-              {/* Submit */}
+              {/* Submit + No Show */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.45 }}
+                className="space-y-3"
               >
                 <Magnet strength={0.08}>
                   <Button
@@ -267,6 +267,38 @@ export function ScoreForm({
                     )}
                   </Button>
                 </Magnet>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setSubmitting(true);
+                    setError(null);
+                    const result = await markNoShow({ eventId, participantId, judgeName });
+                    setSubmitting(false);
+                    if (result.error) {
+                      setError(result.error);
+                      return;
+                    }
+                    setSuccess(true);
+                    setTimeout(() => {
+                      setSuccess(false);
+                      setCreativity(3);
+                      setThoroughness(3);
+                      setClarity(3);
+                      setStudentIndependence(3);
+                      setFeedback("");
+                      onScored();
+                      onClose();
+                    }, 1200);
+                  }}
+                  disabled={submitting}
+                  className="w-full h-10 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-xl transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                  Student Not Present (No Show)
+                </button>
               </motion.div>
             </motion.div>
           )}

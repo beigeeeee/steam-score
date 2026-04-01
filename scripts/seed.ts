@@ -66,13 +66,14 @@ async function seed() {
   console.log(`✓ Created ${participants.length} participants`);
 
   // Create scores from 3 judges
+  // Categories: [creativity, thoroughness, clarity, studentIndependence] (1-5 scale)
   const judges = ["Dr. Martinez", "Prof. Chen", "Ms. Johnson"];
   const scoreData: Record<string, number[][]> = {
-    p1: [[8, 7, 9, 8], [7, 8, 8, 7], [9, 7, 8, 9]],
-    p2: [[9, 8, 9, 8], [8, 9, 9, 9], [9, 8, 10, 8]],
-    p3: [[10, 9, 9, 9], [9, 10, 8, 9], [10, 9, 9, 10]],
-    p4: [[8, 9, 7, 9], [7, 8, 8, 8], [9, 9, 8, 9]],
-    p5: [[7, 8, 8, 7], [8, 7, 9, 8], [8, 8, 7, 8]],
+    p1: [[4, 3, 5, 4], [3, 4, 4, 3], [5, 3, 4, 4]],
+    p2: [[5, 4, 4, 4], [4, 5, 5, 4], [4, 4, 5, 4]],
+    p3: [[5, 5, 4, 5], [5, 5, 4, 4], [5, 4, 5, 5]],
+    p4: [[4, 4, 3, 5], [3, 4, 4, 4], [4, 5, 4, 5]],
+    p5: [[3, 4, 4, 3], [4, 3, 4, 4], [4, 4, 3, 4]],
   };
 
   const feedbacks: Record<string, string[]> = {
@@ -106,17 +107,17 @@ async function seed() {
   let scoreCount = 0;
   for (const [participantId, scores] of Object.entries(scoreData)) {
     for (let j = 0; j < judges.length; j++) {
-      const [creativity, scientificMethod, presentation, impact] = scores[j];
-      const total = creativity + scientificMethod + presentation + impact;
+      const [creativity, thoroughness, clarity, studentIndependence] = scores[j];
+      const total = creativity + thoroughness + clarity + studentIndependence;
       const scoreId = `${judges[j].toLowerCase().replace(/\s+/g, "-")}_${participantId}`;
 
       await eventRef.collection("scores").doc(scoreId).set({
         participantId,
         judgeName: judges[j],
         creativity,
-        scientificMethod,
-        presentation,
-        impact,
+        thoroughness,
+        clarity,
+        studentIndependence,
         feedback: feedbacks[participantId][j],
         total,
         submittedAt: new Date().toISOString(),

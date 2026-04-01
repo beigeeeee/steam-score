@@ -20,6 +20,7 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { ParticipantCard } from "@/components/participant-card";
 import { ScoreForm } from "@/components/score-form";
+import { RubricModal } from "@/components/rubric-modal";
 import { useScores } from "@/hooks/use-scores";
 
 interface Event {
@@ -32,6 +33,7 @@ interface Event {
 export function JudgeInterface({ event }: { event: Event }) {
   const [judgeName, setJudgeName] = useState("");
   const [registered, setRegistered] = useState(false);
+  const [rubricAcknowledged, setRubricAcknowledged] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<{
     id: string;
@@ -49,6 +51,10 @@ export function JudgeInterface({ event }: { event: Event }) {
     if (saved) {
       setJudgeName(saved);
       setRegistered(true);
+    }
+    const ack = localStorage.getItem(`rubric-ack-${event.id}`);
+    if (ack) {
+      setRubricAcknowledged(true);
     }
   }, [event.id]);
 
@@ -71,10 +77,10 @@ export function JudgeInterface({ event }: { event: Event }) {
     setRegistered(false);
   }
 
-  const scoredIds = new Set(
-    scores
-      .filter((s) => s.judgeName.toLowerCase() === judgeName.toLowerCase())
-      .map((s) => s.participantId)
+  const myScores = scores.filter((s) => s.judgeName.toLowerCase() === judgeName.toLowerCase());
+  const scoredIds = new Set(myScores.map((s) => s.participantId));
+  const noShowIds = new Set(
+    myScores.filter((s) => s.noShow).map((s) => s.participantId)
   );
 
   const allScored =
@@ -279,6 +285,16 @@ export function JudgeInterface({ event }: { event: Event }) {
     );
   }
 
+  // ── Rubric acknowledgment (first time only) ──
+  if (!rubricAcknowledged) {
+    return (
+      <RubricModal
+        eventId={event.id}
+        onAcknowledge={() => setRubricAcknowledged(true)}
+      />
+    );
+  }
+
   // ── Screen 2: Participant List ──
   return (
     <div className="min-h-dvh bg-background flex flex-col">
@@ -373,6 +389,7 @@ export function JudgeInterface({ event }: { event: Event }) {
                     table={p.table}
                     location={p.location}
                     scored={scoredIds.has(p.id)}
+                    noShow={noShowIds.has(p.id)}
                     onClick={() => setSelectedParticipant(p)}
                   />
                 </motion.div>

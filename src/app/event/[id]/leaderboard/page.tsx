@@ -22,7 +22,7 @@ export default async function LeaderboardPage({ params }: Props) {
   const participants = Object.fromEntries(
     participantsSnap.docs.map((p) => [
       p.id,
-      p.data() as { name: string; projectTitle: string; grade?: string },
+      p.data() as { name: string; projectTitle: string; grade?: string; location?: number; table?: number },
     ])
   );
 

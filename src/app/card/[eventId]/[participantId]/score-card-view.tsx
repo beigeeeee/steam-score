@@ -12,12 +12,13 @@ import {
 import { BlurFade } from "@/components/reactbits/blur-fade";
 import { CountUp } from "@/components/reactbits/count-up";
 import { cn } from "@/lib/utils";
+import { getScoreLevel, RIBBONS, assignRibbon } from "@/lib/schemas";
 
 interface Stats {
   avgCreativity: number;
-  avgScientificMethod: number;
-  avgPresentation: number;
-  avgImpact: number;
+  avgThoroughness: number;
+  avgClarity: number;
+  avgStudentIndependence: number;
   avgTotal: number;
   judgeCount: number;
   feedbacks: { judgeName: string; text: string }[];
@@ -59,10 +60,10 @@ export function ScoreCardView({
   }
 
   const radarData = [
-    { category: "Creativity", score: stats.avgCreativity, fullMark: 10 },
-    { category: "Method", score: stats.avgScientificMethod, fullMark: 10 },
-    { category: "Presentation", score: stats.avgPresentation, fullMark: 10 },
-    { category: "Impact", score: stats.avgImpact, fullMark: 10 },
+    { category: "Creativity", score: stats.avgCreativity, fullMark: 5 },
+    { category: "Thoroughness", score: stats.avgThoroughness, fullMark: 5 },
+    { category: "Clarity", score: stats.avgClarity, fullMark: 5 },
+    { category: "Independence", score: stats.avgStudentIndependence, fullMark: 5 },
   ];
 
   return (
@@ -96,7 +97,7 @@ export function ScoreCardView({
                 />
                 <PolarRadiusAxis
                   angle={90}
-                  domain={[0, 10]}
+                  domain={[0, 5]}
                   tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                   axisLine={false}
                 />
@@ -125,12 +126,18 @@ export function ScoreCardView({
               >
                 <div className={cn(
                   "text-xl font-bold tabular-nums",
-                  d.score >= 8 ? "text-primary" : "text-foreground"
+                  d.score >= 4 ? "text-primary" : d.score >= 3 ? "text-foreground" : "text-orange-500"
                 )}>
                   <CountUp value={d.score} duration={1 + i * 0.2} />
                 </div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-1 font-medium">
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 font-medium">
                   {d.category}
+                </div>
+                <div className={cn(
+                  "text-[9px] font-medium mt-0.5",
+                  d.score >= 4 ? "text-primary/70" : d.score >= 3 ? "text-muted-foreground" : "text-orange-400"
+                )}>
+                  {getScoreLevel(Math.round(d.score))}
                 </div>
               </motion.div>
             ))}
@@ -164,20 +171,35 @@ export function ScoreCardView({
           </BlurFade>
         )}
 
-        {/* Total Score */}
+        {/* Total Score + Ribbon */}
         <BlurFade delay={0.7}>
-          <div className="text-center py-6 bg-muted/30 rounded-2xl">
-            <div className="inline-flex items-baseline gap-0.5">
-              <span className="text-5xl font-bold tabular-nums text-primary">
-                <CountUp value={stats.avgTotal} duration={1.5} />
-              </span>
-              <span className="text-lg text-muted-foreground font-medium">/40</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Average across {stats.judgeCount} judge
-              {stats.judgeCount !== 1 ? "s" : ""}
-            </p>
-          </div>
+          {(() => {
+            const ribbonType = assignRibbon(stats.avgTotal);
+            const ribbon = RIBBONS[ribbonType];
+            return (
+              <div className="text-center py-6 bg-muted/30 rounded-2xl">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 12, delay: 1.0 }}
+                  className={cn("inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold mb-3", ribbon.bg, ribbon.color)}
+                >
+                  <span className="text-lg">{ribbon.emoji}</span>
+                  <span>{ribbon.label}</span>
+                </motion.div>
+                <div className="inline-flex items-baseline gap-0.5">
+                  <span className="text-5xl font-bold tabular-nums text-primary">
+                    <CountUp value={stats.avgTotal} duration={1.5} />
+                  </span>
+                  <span className="text-lg text-muted-foreground font-medium">/20</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Average across {stats.judgeCount} judge
+                  {stats.judgeCount !== 1 ? "s" : ""}
+                </p>
+              </div>
+            );
+          })()}
         </BlurFade>
 
         {/* Share button */}
@@ -189,7 +211,7 @@ export function ScoreCardView({
                 if (typeof navigator !== "undefined" && navigator.share) {
                   navigator.share({
                     title: `${participantName} - ${eventName}`,
-                    text: `${participantName} scored ${stats.avgTotal.toFixed(1)}/40 at ${eventName}!`,
+                    text: `${participantName} scored ${stats.avgTotal.toFixed(1)}/20 at ${eventName}!`,
                     url: window.location.href,
                   });
                 } else {

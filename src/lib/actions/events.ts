@@ -88,6 +88,46 @@ export async function addParticipant(eventId: string, formData: FormData) {
   return { id: participantRef.id };
 }
 
+export async function updateParticipant(
+  eventId: string,
+  participantId: string,
+  data: {
+    name: string;
+    projectTitle: string;
+    grade?: string;
+    type?: string;
+    members?: string[];
+    parentEmail?: string;
+    needsOutlet?: boolean;
+    projectCategory?: string;
+    table?: number;
+    location?: number;
+  }
+) {
+  const uid = await getSessionUid();
+  if (!uid) return { error: "Not authenticated" };
+
+  await adminDb
+    .collection("events")
+    .doc(eventId)
+    .collection("participants")
+    .doc(participantId)
+    .update({
+      name: data.name,
+      projectTitle: data.projectTitle || "",
+      grade: data.grade || "",
+      type: data.type || "individual",
+      members: data.members || [],
+      parentEmail: data.parentEmail || "",
+      needsOutlet: data.needsOutlet || false,
+      projectCategory: data.projectCategory || "",
+      table: data.table || null,
+      location: data.location || null,
+    });
+
+  return { success: true };
+}
+
 export async function deleteParticipant(eventId: string, participantId: string) {
   const uid = await getSessionUid();
   if (!uid) return { error: "Not authenticated" };

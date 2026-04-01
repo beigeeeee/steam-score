@@ -31,9 +31,9 @@ export default async function OGImage({
 
   const categories = [
     { label: "Creativity", value: stats?.avgCreativity ?? 0 },
-    { label: "Method", value: stats?.avgScientificMethod ?? 0 },
-    { label: "Presentation", value: stats?.avgPresentation ?? 0 },
-    { label: "Impact", value: stats?.avgImpact ?? 0 },
+    { label: "Thoroughness", value: stats?.avgThoroughness ?? 0 },
+    { label: "Clarity", value: stats?.avgClarity ?? 0 },
+    { label: "Independence", value: stats?.avgStudentIndependence ?? 0 },
   ];
 
   return new ImageResponse(
@@ -89,7 +89,7 @@ export default async function OGImage({
           <span style={{ fontSize: 64, fontWeight: 700 }}>
             {stats?.avgTotal.toFixed(1) ?? "0.0"}
           </span>
-          <span style={{ fontSize: 28, color: "#888" }}>/40</span>
+          <span style={{ fontSize: 28, color: "#888" }}>/20</span>
         </div>
 
         <div style={{ fontSize: 14, color: "#aaa", marginTop: 40 }}>

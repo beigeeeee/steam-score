@@ -2,23 +2,28 @@ export interface Score {
   participantId: string;
   judgeName: string;
   creativity: number;
-  scientificMethod: number;
-  presentation: number;
-  impact: number;
+  thoroughness: number;
+  clarity: number;
+  studentIndependence: number;
   feedback?: string;
   total: number;
+  noShow?: boolean;
 }
 
 export interface ParticipantScore {
   participantId: string;
   avgCreativity: number;
-  avgScientificMethod: number;
-  avgPresentation: number;
-  avgImpact: number;
+  avgThoroughness: number;
+  avgClarity: number;
+  avgStudentIndependence: number;
   avgTotal: number;
   judgeCount: number;
+  noShowCount: number;
+  ribbon: import("@/lib/schemas").RibbonType;
   feedbacks: { judgeName: string; text: string }[];
 }
+
+import { assignRibbon } from "@/lib/schemas";
 
 export function aggregateScores(scores: Score[]): Map<string, ParticipantScore> {
   const byParticipant = new Map<string, Score[]>();
@@ -32,20 +37,26 @@ export function aggregateScores(scores: Score[]): Map<string, ParticipantScore> 
   const results = new Map<string, ParticipantScore>();
 
   for (const [participantId, participantScores] of byParticipant) {
-    const n = participantScores.length;
+    const noShowCount = participantScores.filter((s) => s.noShow).length;
+    const actualScores = participantScores.filter((s) => !s.noShow);
+    const n = actualScores.length;
+
     const sum = (fn: (s: Score) => number) =>
-      participantScores.reduce((acc, s) => acc + fn(s), 0);
+      actualScores.reduce((acc, s) => acc + fn(s), 0);
+
+    const avgTotal = n > 0 ? Math.round((sum((s) => s.total) / n) * 10) / 10 : 0;
 
     results.set(participantId, {
       participantId,
-      avgCreativity: Math.round((sum((s) => s.creativity) / n) * 10) / 10,
-      avgScientificMethod:
-        Math.round((sum((s) => s.scientificMethod) / n) * 10) / 10,
-      avgPresentation: Math.round((sum((s) => s.presentation) / n) * 10) / 10,
-      avgImpact: Math.round((sum((s) => s.impact) / n) * 10) / 10,
-      avgTotal: Math.round((sum((s) => s.total) / n) * 10) / 10,
-      judgeCount: n,
-      feedbacks: participantScores
+      avgCreativity: n > 0 ? Math.round((sum((s) => s.creativity) / n) * 10) / 10 : 0,
+      avgThoroughness: n > 0 ? Math.round((sum((s) => s.thoroughness) / n) * 10) / 10 : 0,
+      avgClarity: n > 0 ? Math.round((sum((s) => s.clarity) / n) * 10) / 10 : 0,
+      avgStudentIndependence: n > 0 ? Math.round((sum((s) => s.studentIndependence) / n) * 10) / 10 : 0,
+      avgTotal,
+      judgeCount: participantScores.length,
+      noShowCount,
+      ribbon: assignRibbon(avgTotal),
+      feedbacks: actualScores
         .filter((s) => s.feedback && s.feedback.trim().length > 0)
         .map((s) => ({ judgeName: s.judgeName, text: s.feedback! })),
     });

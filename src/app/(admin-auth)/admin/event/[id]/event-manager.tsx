@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { addParticipant, deleteParticipant } from "@/lib/actions/events";
+import { EditParticipantDialog } from "@/components/edit-participant-dialog";
 import { FadeIn } from "@/components/fade-in";
 import { BlurFade } from "@/components/reactbits/blur-fade";
 import { toast } from "sonner";
@@ -38,6 +39,8 @@ export function EventManager({
   const [isTeam, setIsTeam] = useState(false);
   const [memberInputs, setMemberInputs] = useState(["", "", ""]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"list" | "team">("list");
+  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const CATEGORIES = [
@@ -108,34 +111,131 @@ export function EventManager({
 
     setImporting(true);
     const text = await file.text();
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    const lines = text.split("\n").map((l) => l.trimEnd()).filter(Boolean);
 
-    const firstLine = lines[0].toLowerCase();
-    const hasHeader =
-      firstLine.includes("name") ||
-      firstLine.includes("team") ||
-      firstLine.includes("project") ||
-      firstLine.includes("title");
+    if (lines.length < 2) {
+      toast.error("File is empty or has no data rows.");
+      setImporting(false);
+      return;
+    }
 
-    const dataLines = hasHeader ? lines.slice(1) : lines;
+    // CSV parser that handles quoted fields with commas inside
+    function parseCSVLine(line: string): string[] {
+      const fields: string[] = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          inQuotes = !inQuotes;
+        } else if ((ch === "," || ch === "\t") && !inQuotes) {
+          fields.push(current.trim());
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+      fields.push(current.trim());
+      return fields;
+    }
+
+    const firstLine = lines[0];
+    const headerFields = parseCSVLine(firstLine);
+
+    // Parse header to find column indices
+    const headers = headerFields.map((h) => h.toLowerCase().replace(/[()]/g, ""));
+
+    console.log("[CSV Import] Headers:", headers);
+
+    const colMap = {
+      email: headers.findIndex((h) => h.includes("email")),
+      power: headers.findIndex((h) => h.includes("power") || h.includes("outlet")),
+      location: headers.findIndex((h) => h === "location"),
+      table: headers.findIndex((h) => h === "table"),
+      names: headers.findIndex((h) => h.includes("participantname") || h === "name" || h === "names"),
+      teamCount: headers.findIndex((h) => h.includes("teamcount") || h.includes("team count") || h === "count"),
+      grade: headers.findIndex((h) => h.includes("grade")),
+      teacher: headers.findIndex((h) => h.includes("teacher")),
+      project: headers.findIndex((h) => h.includes("project name")),
+      category: headers.findIndex((h) => h.includes("category")),
+    };
+
+    console.log("[CSV Import] Column map:", colMap);
+
+    const hasKnownHeaders = colMap.names !== -1 || colMap.email !== -1;
+
+    const dataLines = hasKnownHeaders ? lines.slice(1) : (
+      firstLine.toLowerCase().includes("name") || firstLine.toLowerCase().includes("email")
+        ? lines.slice(1)
+        : lines
+    );
+
     let added = 0;
     let failed = 0;
+    let skipped = 0;
 
     for (const line of dataLines) {
-      const parts = line.split(",").map((p) => p.trim().replace(/^"|"$/g, ""));
-      const name = parts[0];
-      const projectTitle = parts[1] || name;
-      const grade = parts[2] || "";
-      // 4th column onwards = team members (optional)
-      const members = parts.slice(3).filter(Boolean);
+      if (!line.trim()) continue;
 
-      if (!name) continue;
+      const parts = parseCSVLine(line);
+
+      // Parse columns
+      const participantNames = hasKnownHeaders
+        ? (colMap.names !== -1 ? parts[colMap.names] || "" : "")
+        : (parts[0] || "");
+      const projectTitle = hasKnownHeaders
+        ? (colMap.project !== -1 ? parts[colMap.project] || "" : "")
+        : (parts[1] || "");
+      const grade = hasKnownHeaders
+        ? (colMap.grade !== -1 ? parts[colMap.grade] || "" : "")
+        : (parts[2] || "");
+      const parentEmail = hasKnownHeaders
+        ? (colMap.email !== -1 ? parts[colMap.email] || "" : "")
+        : "";
+      const powerVal = hasKnownHeaders
+        ? (colMap.power !== -1 ? parts[colMap.power] || "" : "")
+        : "";
+      const needsOutlet = powerVal.toLowerCase() === "yes";
+      const location = hasKnownHeaders && colMap.location !== -1 && parts[colMap.location]
+        ? Number(parts[colMap.location]) || undefined
+        : undefined;
+      const table = hasKnownHeaders && colMap.table !== -1 && parts[colMap.table]
+        ? Number(parts[colMap.table]) || undefined
+        : undefined;
+      const projectCategory = hasKnownHeaders
+        ? (colMap.category !== -1 ? parts[colMap.category] || "" : "")
+        : "";
+      const teamCount = hasKnownHeaders && colMap.teamCount !== -1
+        ? Number(parts[colMap.teamCount]) || 1
+        : 1;
+
+      if (!participantNames.trim()) { skipped++; continue; }
+
+      // Split names by comma — the CSV parser already extracted the quoted field correctly
+      // so "Aadhi Om Prakash, Ahir Rakshit" is now the raw string with commas
+      const nameList = participantNames.split(",").map((n) => n.trim()).filter(Boolean);
+      const isTeamEntry = teamCount > 1 || nameList.length > 1;
+      const members = isTeamEntry ? nameList : [];
+
+      console.log(`[CSV Import] "${participantNames}" → teamCount=${teamCount}, nameList=${nameList.length}, isTeam=${isTeamEntry}`, members);
+
+      // Team name: use project name if it's real, otherwise Team#Location
+      const displayName = isTeamEntry
+        ? (projectTitle && projectTitle.toLowerCase() !== "tbd" && projectTitle.trim() !== ""
+          ? projectTitle
+          : `Team#${location || "?"}`)
+        : nameList[0];
 
       const formData = new FormData();
-      formData.set("name", name);
-      formData.set("projectTitle", projectTitle);
+      formData.set("name", displayName);
+      formData.set("projectTitle", projectTitle || "");
       formData.set("grade", grade);
-      if (members.length > 0) {
+      formData.set("parentEmail", parentEmail);
+      formData.set("needsOutlet", needsOutlet ? "true" : "false");
+      formData.set("projectCategory", projectCategory);
+      if (location) formData.set("location", String(location));
+      if (table) formData.set("table", String(table));
+      if (isTeamEntry) {
         formData.set("type", "team");
         formData.set("members", members.join(","));
       }
@@ -146,18 +246,34 @@ export function EventManager({
       } else {
         setParticipants((prev) => [
           ...prev,
-          { id: result.id!, name, projectTitle, grade, type: members.length > 0 ? "team" : "individual", members },
+          {
+            id: result.id!,
+            name: displayName,
+            projectTitle: projectTitle || "",
+            grade,
+            type: isTeamEntry ? "team" : "individual",
+            members,
+            parentEmail,
+            needsOutlet,
+            projectCategory,
+            table,
+            location,
+          },
         ]);
         added++;
       }
     }
 
+    const msg = [`${added} imported`];
+    if (failed > 0) msg.push(`${failed} failed`);
+    if (skipped > 0) msg.push(`${skipped} skipped`);
+
     if (added > 0) {
-      toast.success(`${added} participant${added !== 1 ? "s" : ""} imported`);
+      toast.success(msg.join(", "));
       router.refresh();
+    } else {
+      toast.error(msg.join(", ") || "No participants found.");
     }
-    if (failed > 0) toast.error(`${failed} row${failed !== 1 ? "s" : ""} failed`);
-    if (added === 0 && failed === 0) toast.error("No participants found in CSV.");
 
     setImporting(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -243,12 +359,13 @@ export function EventManager({
                 <Label htmlFor="projectTitle" className="text-xs">Project Title</Label>
                 <Input id="projectTitle" name="projectTitle" placeholder="e.g. Volcano Simulation" required className="h-10" />
               </div>
-              {!isTeam && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="grade" className="text-xs">Grade</Label>
-                  <Input id="grade" name="grade" placeholder="e.g. 6th" className="h-10" />
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="grade" className="text-xs">Grade</Label>
+                <Input id="grade" name="grade" placeholder={isTeam ? "Highest grade" : "e.g. 6th"} className="h-10" />
+                {isTeam && (
+                  <p className="text-[10px] text-muted-foreground">Use the highest grade number in the team</p>
+                )}
+              </div>
             </div>
 
             {/* Team members */}
@@ -375,13 +492,15 @@ export function EventManager({
           </form>
 
           <BlurFade delay={0.2}>
-            <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+            <div className="mt-3 p-3 bg-muted/50 rounded-lg space-y-1">
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                <span className="font-medium text-foreground/70">CSV format:</span>{" "}
-                <code className="bg-muted px-1 py-0.5 rounded text-[10px]">Name, Project, Grade, Member1, Member2, Member3</code>
+                <span className="font-medium text-foreground/70">Supports two formats:</span>
               </p>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Members are optional. Individual: <code className="bg-muted px-1 py-0.5 rounded">Sarah Chen, Volcano Sim, 6th</code>
+              <p className="text-[10px] text-muted-foreground">
+                <span className="font-medium">STEM Fair</span> (tab-separated): Email, Power, Location, Table, Names, TeamCount, Grade, Teacher, Project, Category
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                <span className="font-medium">Simple</span> (comma-separated): <code className="bg-muted px-1 py-0.5 rounded">Name, Project, Grade</code>
               </p>
             </div>
           </BlurFade>
@@ -390,16 +509,181 @@ export function EventManager({
 
       {/* Participant List */}
       <div>
-        <h2 className="text-sm font-semibold mb-3">
-          Participants ({participants.length})
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold">
+            Participants ({participants.length})
+            <span className="text-muted-foreground font-normal ml-1">
+              · {participants.filter((p) => p.type === "team").length} teams
+              · {participants.filter((p) => p.type !== "team").length} individual
+            </span>
+          </h2>
+          {/* View toggle */}
+          <div className="flex gap-0.5 p-0.5 bg-muted rounded-md">
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded cursor-pointer transition-colors ${viewMode === "list" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+              aria-label="List view"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("team")}
+              className={`p-1.5 rounded cursor-pointer transition-colors ${viewMode === "team" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+              aria-label="Team view"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         {participants.length === 0 ? (
           <FadeIn>
             <p className="text-sm text-muted-foreground py-8 text-center">
               No participants yet. Add one above or import a CSV.
             </p>
           </FadeIn>
+        ) : viewMode === "team" ? (
+          /* ── TEAM VIEW ── */
+          <div className="space-y-4">
+            {/* Teams */}
+            {participants.filter((p) => p.type === "team").length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">
+                  Teams ({participants.filter((p) => p.type === "team").length})
+                </p>
+                <div className="space-y-2">
+                  <AnimatePresence mode="popLayout">
+                    {participants.filter((p) => p.type === "team").map((p) => (
+                      <motion.div
+                        key={p.id}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -200, transition: { duration: 0.25 } }}
+                        className="p-4 rounded-xl border border-primary/20 bg-primary/[0.02] group hover:bg-primary/[0.04] transition-colors"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{p.name}</span>
+                              <span className="text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                {p.members?.length || 0} members
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {p.projectTitle && <span>{p.projectTitle}</span>}
+                              {p.grade && <span className="ml-1.5">· Grade {p.grade}</span>}
+                              {p.projectCategory && <span className="ml-1.5">· {p.projectCategory}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => setEditingParticipant(p)}
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                              aria-label={`Edit ${p.name}`}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(p)}
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              aria-label={`Remove ${p.name}`}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {/* Member list */}
+                        <div className="space-y-1 ml-1">
+                          {p.members?.map((member, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[9px] font-bold shrink-0">
+                                {member.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-xs">{member}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Badges */}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {p.location && (
+                            <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Loc {p.location}</span>
+                          )}
+                          {p.table && (
+                            <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Table {p.table}</span>
+                          )}
+                          {p.needsOutlet && (
+                            <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-medium">Outlet</span>
+                          )}
+                          {p.parentEmail && (
+                            <span className="text-[10px] text-muted-foreground/50 truncate max-w-[180px]">{p.parentEmail}</span>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {/* Individuals */}
+            {participants.filter((p) => p.type !== "team").length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">
+                  Individual ({participants.filter((p) => p.type !== "team").length})
+                </p>
+                <div className="space-y-2">
+                  <AnimatePresence mode="popLayout">
+                    {participants.filter((p) => p.type !== "team").map((p) => (
+                      <motion.div
+                        key={p.id}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -200, transition: { duration: 0.25 } }}
+                        className="flex items-center justify-between p-3 rounded-lg border group hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="min-w-0 mr-3">
+                          <div className="font-medium text-sm">{p.name}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {p.projectTitle && <span>{p.projectTitle}</span>}
+                            {p.grade && <span className="ml-1.5">· Grade {p.grade}</span>}
+                            {p.projectCategory && <span className="ml-1.5">· {p.projectCategory}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {p.location && <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Loc {p.location}</span>}
+                            {p.table && <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Table {p.table}</span>}
+                            {p.needsOutlet && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-medium">Outlet</span>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDelete(p)}
+                          className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                          aria-label={`Remove ${p.name}`}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                          </svg>
+                        </button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
+          /* ── LIST VIEW ── */
           <div className="space-y-2">
             <AnimatePresence mode="popLayout">
               {participants.map((p) => (
@@ -414,10 +698,10 @@ export function EventManager({
                 >
                   <div className="min-w-0 mr-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{p.name}</span>
+                      <span className="font-medium text-sm">{p.name}</span>
                       {p.type === "team" ? (
                         <span className="shrink-0 text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                          Team
+                          Team · {p.members?.length || 0}
                         </span>
                       ) : (
                         <span className="shrink-0 text-[10px] font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
@@ -425,67 +709,71 @@ export function EventManager({
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate mt-0.5">
-                      {p.projectTitle}
-                      {p.grade && (
-                        <span className="ml-1.5 text-[10px] text-muted-foreground/70">· {p.grade} grade</span>
-                      )}
-                      {p.projectCategory && (
-                        <span className="ml-1.5 text-[10px] text-muted-foreground/70">
-                          · {p.projectCategory.split(", ").length > 2
-                            ? `${p.projectCategory.split(", ").slice(0, 2).join(", ")} +${p.projectCategory.split(", ").length - 2}`
-                            : p.projectCategory}
-                        </span>
-                      )}
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {p.projectTitle && <span>{p.projectTitle}</span>}
+                      {p.grade && <span className="ml-1.5">· Grade {p.grade}</span>}
+                      {p.projectCategory && <span className="ml-1.5">· {p.projectCategory}</span>}
                     </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {p.type === "team" && p.members && p.members.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <svg className="w-3 h-3 text-muted-foreground/50 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                          </svg>
-                          <span className="text-[10px] text-muted-foreground/70 truncate">
-                            {p.members.join(", ")}
+                    {/* Team members shown inline */}
+                    {p.type === "team" && p.members && p.members.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        {p.members.map((member, i) => (
+                          <span key={i} className="text-[10px] bg-primary/5 text-primary/80 px-2 py-0.5 rounded-full">
+                            {member}
                           </span>
-                        </div>
-                      )}
-                      {p.table && (
-                        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">
-                          Table {p.table}
-                        </span>
-                      )}
-                      {p.location && (
-                        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">
-                          Loc {p.location}
-                        </span>
-                      )}
-                      {p.needsOutlet && (
-                        <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-medium">
-                          Outlet
-                        </span>
-                      )}
-                      {p.parentEmail && (
-                        <span className="text-[10px] text-muted-foreground/50 truncate max-w-[150px]">
-                          {p.parentEmail}
-                        </span>
-                      )}
+                        ))}
+                      </div>
+                    )}
+                    {/* Badges row */}
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {p.location && <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Loc {p.location}</span>}
+                      {p.table && <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Table {p.table}</span>}
+                      {p.needsOutlet && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-medium">Outlet</span>}
+                      {p.parentEmail && <span className="text-[10px] text-muted-foreground/50 truncate max-w-[150px]">{p.parentEmail}</span>}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(p)}
-                    className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-destructive/50 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer md:opacity-0 md:group-hover:opacity-100"
-                    aria-label={`Remove ${p.name}`}
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => setEditingParticipant(p)}
+                      className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      aria-label={`Edit ${p.name}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p)}
+                      className="w-8 h-8 rounded-md flex items-center justify-center text-destructive/50 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      aria-label={`Remove ${p.name}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
         )}
       </div>
+
+      {/* Edit dialog */}
+      {editingParticipant && (
+        <EditParticipantDialog
+          eventId={eventId}
+          participant={editingParticipant}
+          open={!!editingParticipant}
+          onClose={() => setEditingParticipant(null)}
+          onSaved={(updated) => {
+            setParticipants((prev) =>
+              prev.map((p) => (p.id === updated.id ? updated : p))
+            );
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

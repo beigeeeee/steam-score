@@ -5,11 +5,11 @@ function makeScore(overrides: Partial<Score> = {}): Score {
   return {
     participantId: "p1",
     judgeName: "Judge A",
-    creativity: 8,
-    scientificMethod: 7,
-    presentation: 9,
-    impact: 8,
-    total: 32,
+    creativity: 4,
+    thoroughness: 3,
+    clarity: 5,
+    studentIndependence: 4,
+    total: 16,
     feedback: "Good work",
     ...overrides,
   };
@@ -18,18 +18,18 @@ function makeScore(overrides: Partial<Score> = {}): Score {
 describe("aggregateScores", () => {
   it("computes correct averages for multiple judges", () => {
     const scores: Score[] = [
-      makeScore({ judgeName: "A", creativity: 8, scientificMethod: 6, presentation: 10, impact: 8, total: 32 }),
-      makeScore({ judgeName: "B", creativity: 6, scientificMethod: 8, presentation: 8, impact: 6, total: 28 }),
+      makeScore({ judgeName: "A", creativity: 4, thoroughness: 3, clarity: 5, studentIndependence: 4, total: 16 }),
+      makeScore({ judgeName: "B", creativity: 2, thoroughness: 4, clarity: 3, studentIndependence: 3, total: 12 }),
     ];
 
     const result = aggregateScores(scores);
     const p1 = result.get("p1")!;
 
-    expect(p1.avgCreativity).toBe(7);
-    expect(p1.avgScientificMethod).toBe(7);
-    expect(p1.avgPresentation).toBe(9);
-    expect(p1.avgImpact).toBe(7);
-    expect(p1.avgTotal).toBe(30);
+    expect(p1.avgCreativity).toBe(3);
+    expect(p1.avgThoroughness).toBe(3.5);
+    expect(p1.avgClarity).toBe(4);
+    expect(p1.avgStudentIndependence).toBe(3.5);
+    expect(p1.avgTotal).toBe(14);
     expect(p1.judgeCount).toBe(2);
   });
 
@@ -40,24 +40,24 @@ describe("aggregateScores", () => {
 
   it("returns raw scores when single judge", () => {
     const scores: Score[] = [
-      makeScore({ creativity: 9, scientificMethod: 8, presentation: 7, impact: 6, total: 30 }),
+      makeScore({ creativity: 5, thoroughness: 4, clarity: 3, studentIndependence: 2, total: 14 }),
     ];
 
     const result = aggregateScores(scores);
     const p1 = result.get("p1")!;
 
-    expect(p1.avgCreativity).toBe(9);
-    expect(p1.avgScientificMethod).toBe(8);
-    expect(p1.avgPresentation).toBe(7);
-    expect(p1.avgImpact).toBe(6);
+    expect(p1.avgCreativity).toBe(5);
+    expect(p1.avgThoroughness).toBe(4);
+    expect(p1.avgClarity).toBe(3);
+    expect(p1.avgStudentIndependence).toBe(2);
     expect(p1.judgeCount).toBe(1);
   });
 
   it("groups by participantId", () => {
     const scores: Score[] = [
-      makeScore({ participantId: "p1", judgeName: "A", total: 32 }),
-      makeScore({ participantId: "p2", judgeName: "A", creativity: 6, total: 28 }),
-      makeScore({ participantId: "p1", judgeName: "B", total: 32 }),
+      makeScore({ participantId: "p1", judgeName: "A", total: 16 }),
+      makeScore({ participantId: "p2", judgeName: "A", creativity: 3, total: 14 }),
+      makeScore({ participantId: "p1", judgeName: "B", total: 16 }),
     ];
 
     const result = aggregateScores(scores);
