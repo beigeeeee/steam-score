@@ -105,15 +105,15 @@ Supports two formats:
 
 ```csv
 Email,Power Needed,Location,Table,ParticipantNames,TeamCount,Grade(s),Teacher(s),Project Name,Project Category
-parent@email.com,-,1,1,Ali Shoaib,1,K,Ms Smith,Volcano,Science
-parent@email.com,-,4,1,"Aadhi, Ahir",2,K,Ms Sicard,Lava lamp,Science
+parent@email.com,-,1,1,Student Name,1,K,Teacher Name,My Project,Science
+parent@email.com,-,4,1,"Student A, Student B",2,K,Teacher Name,Team Project,Science
 ```
 
 **Simple format:**
 
 ```csv
 Name, Project Title, Grade
-Sarah Chen, Volcano Simulation, 6th
+Student Name, Volcano Simulation, 6th
 ```
 
 Teams are auto-detected when `TeamCount > 1` or names contain commas. Teams without a project name get auto-named `Team#Location`.
