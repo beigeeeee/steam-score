@@ -148,9 +148,14 @@ export function QRSheet({ eventName, qrToken, eventId }: QRSheetProps) {
               </p>
             </BlurFade>
             <BlurFade delay={1.1}>
-              <p className="text-xs text-muted-foreground mt-6 font-mono print:text-sm">
+              <a
+                href={scoreUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:text-primary/80 underline underline-offset-2 mt-6 font-mono print:text-sm print:text-muted-foreground print:no-underline inline-block cursor-pointer"
+              >
                 {scoreUrl}
-              </p>
+              </a>
             </BlurFade>
           </div>
 

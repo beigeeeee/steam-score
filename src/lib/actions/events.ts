@@ -61,8 +61,8 @@ export async function addParticipant(eventId: string, formData: FormData) {
     return { error: parsed.error.message };
   }
 
-  if (parsed.data.type === "team" && parsed.data.members && parsed.data.members.length > 3) {
-    return { error: "A team can have no more than 3 members" };
+  if (parsed.data.type === "team" && parsed.data.members && parsed.data.members.length > 4) {
+    return { error: "A team can have no more than 4 members" };
   }
 
   const participantRef = adminDb

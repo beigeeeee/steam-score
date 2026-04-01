@@ -20,7 +20,7 @@ export const participantSchema = z.object({
   projectTitle: z.string().min(1, "Project title is required").max(300),
   grade: z.string().max(20).optional().default(""),
   type: z.enum(["individual", "team"]).default("individual"),
-  members: z.array(z.string().max(100)).max(3).optional().default([]),
+  members: z.array(z.string().max(100)).max(4).optional().default([]),
   parentEmail: z.string().email("Invalid email").optional().or(z.literal("")),
   needsOutlet: z.boolean().optional().default(false),
   projectCategory: z.string().max(100).optional().default(""),

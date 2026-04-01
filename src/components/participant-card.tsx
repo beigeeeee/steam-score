@@ -10,6 +10,8 @@ interface ParticipantCardProps {
   grade?: string;
   type?: string;
   members?: string[];
+  table?: number;
+  location?: number;
   scored: boolean;
   onClick: () => void;
 }
@@ -20,6 +22,8 @@ export function ParticipantCard({
   grade,
   type,
   members,
+  table,
+  location,
   scored,
   onClick,
 }: ParticipantCardProps) {
@@ -79,6 +83,27 @@ export function ParticipantCard({
               <span className="ml-1.5 text-[10px] text-muted-foreground/70">· {grade} grade</span>
             )}
           </div>
+          {(table || location) && (
+            <div className="flex items-center gap-2 mt-1">
+              {table && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 bg-muted/50 px-1.5 py-0.5 rounded">
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6z" />
+                  </svg>
+                  Table {table}
+                </span>
+              )}
+              {location && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 bg-muted/50 px-1.5 py-0.5 rounded">
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                  </svg>
+                  Location {location}
+                </span>
+              )}
+            </div>
+          )}
           {type === "team" && members && members.length > 0 && (
             <div className="text-[10px] text-muted-foreground/60 truncate mt-0.5">
               {members.join(", ")}

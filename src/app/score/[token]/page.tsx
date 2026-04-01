@@ -27,7 +27,7 @@ async function getEventByToken(token: string) {
   const participants = participantsSnapshot.docs.map((p) => ({
     id: p.id,
     ...p.data(),
-  })) as { id: string; name: string; projectTitle: string; grade?: string; type?: string; members?: string[] }[];
+  })) as { id: string; name: string; projectTitle: string; grade?: string; type?: string; members?: string[]; table?: number; location?: number }[];
 
   return {
     id: doc.id,

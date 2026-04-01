@@ -26,7 +26,7 @@ interface Event {
   id: string;
   name: string;
   date: string;
-  participants: { id: string; name: string; projectTitle: string; grade?: string; type?: string; members?: string[] }[];
+  participants: { id: string; name: string; projectTitle: string; grade?: string; type?: string; members?: string[]; table?: number; location?: number }[];
 }
 
 export function JudgeInterface({ event }: { event: Event }) {
@@ -370,6 +370,8 @@ export function JudgeInterface({ event }: { event: Event }) {
                     grade={p.grade}
                     type={p.type}
                     members={p.members}
+                    table={p.table}
+                    location={p.location}
                     scored={scoredIds.has(p.id)}
                     onClick={() => setSelectedParticipant(p)}
                   />

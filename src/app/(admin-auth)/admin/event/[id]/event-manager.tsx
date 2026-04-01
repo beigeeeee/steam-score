@@ -36,7 +36,7 @@ export function EventManager({
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [isTeam, setIsTeam] = useState(false);
-  const [memberInputs, setMemberInputs] = useState(["", ""]);
+  const [memberInputs, setMemberInputs] = useState(["", "", ""]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,8 +64,8 @@ export function EventManager({
         setAdding(false);
         return;
       }
-      if (members.length > 3) {
-        toast.error("A team can have no more than 3 members");
+      if (members.length > 4) {
+        toast.error("A team can have no more than 4 members");
         setAdding(false);
         return;
       }
@@ -95,7 +95,7 @@ export function EventManager({
         { id: result.id!, name, projectTitle, grade, type: isTeam ? "team" : "individual", members, parentEmail, needsOutlet, projectCategory, table, location },
       ]);
       toast.success(`${name} added`);
-      setMemberInputs(["", ""]);
+      setMemberInputs(["", "", ""]);
       setSelectedCategories([]);
       router.refresh();
     }
@@ -193,7 +193,7 @@ export function EventManager({
   }
 
   function addMemberSlot() {
-    if (memberInputs.length >= 3) return;
+    if (memberInputs.length >= 4) return;
     setMemberInputs((prev) => [...prev, ""]);
   }
 
@@ -227,7 +227,7 @@ export function EventManager({
                 isTeam ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"
               }`}
             >
-              Team (up to 3)
+              Team (up to 4)
             </button>
           </div>
 
@@ -283,7 +283,7 @@ export function EventManager({
                         )}
                       </div>
                     ))}
-                    {memberInputs.length < 3 && (
+                    {memberInputs.length < 4 && (
                       <button
                         type="button"
                         onClick={addMemberSlot}
