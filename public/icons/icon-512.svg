@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="102" fill="#10b981"/>
+  <text x="50%" y="45%" text-anchor="middle" dominant-baseline="central" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="154" fill="white">S</text>
+  <text x="50%" y="75%" text-anchor="middle" dominant-baseline="central" font-family="system-ui,-apple-system,sans-serif" font-weight="500" font-size="77" fill="rgba(255,255,255,0.8)">STEM</text>
+</svg>

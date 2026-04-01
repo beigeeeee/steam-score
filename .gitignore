@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.gstack/
+
+# PWA
+public/sw.js
+public/workbox-*.js
+public/sw.js.map
+public/workbox-*.js.map
+
+# Debug logs
+firebase-debug.log
+firestore-debug.log
+
+# Test results
+test-results/
+
+# gstack
+.gstack/
