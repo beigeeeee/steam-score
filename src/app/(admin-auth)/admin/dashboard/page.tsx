@@ -17,15 +17,10 @@ async function getAdminEvents() {
   const uid = await getSessionUid();
   if (!uid) return [];
 
-  const isEmulator = process.env.NEXT_PUBLIC_USE_EMULATOR === "true";
-  const query = isEmulator
-    ? adminDb.collection("events").orderBy("createdAt", "desc")
-    : adminDb
-        .collection("events")
-        .where("adminUid", "==", uid)
-        .orderBy("createdAt", "desc");
-
-  const snapshot = await query.get();
+  const snapshot = await adminDb
+    .collection("events")
+    .orderBy("createdAt", "desc")
+    .get();
 
   const events = [];
   for (const doc of snapshot.docs) {

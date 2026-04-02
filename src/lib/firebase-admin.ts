@@ -15,14 +15,20 @@ function getAdminApp(): App {
 
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccount) {
-    return initializeApp({
-      credential: cert(JSON.parse(serviceAccount)),
-    });
+    try {
+      const parsed = JSON.parse(serviceAccount);
+      console.log("[Firebase Admin] Initializing with service account:", parsed.client_email);
+      return initializeApp({
+        credential: cert(parsed),
+      });
+    } catch (e) {
+      console.error("[Firebase Admin] Failed to parse service account JSON:", e);
+    }
   }
 
-  // Production: use project ID from env (requires service account for full access)
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   if (projectId) {
+    console.log("[Firebase Admin] Initializing with project ID only:", projectId);
     return initializeApp({ projectId });
   }
 
