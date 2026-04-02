@@ -20,6 +20,12 @@ function getAdminApp(): App {
     });
   }
 
+  // Production: use project ID from env (requires service account for full access)
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (projectId) {
+    return initializeApp({ projectId });
+  }
+
   return initializeApp();
 }
 
